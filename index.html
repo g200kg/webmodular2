@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>Web Modular 2</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Audiowide&family=M+PLUS+Rounded+1c&family=Roboto:ital,wght@0,100..900;1,100..900&display=swap" rel="stylesheet">
+<script>
+WebAudioControlsOptions={
+    knobSrc:"./images/webmodular2_knob.png",
+    knobDiameter:40,
+    paramWidth:32,
+    paramHeight:14,
+    paramColors:"#eee;#124;#fcc",
+    sliderWidth:18,
+    sliderHeight:90,
+    switchWidth:20,
+    switchHeight:20,
+};
+JackDiameter = 16;
+</script>
+<script src="./webaudio-controls.js"></script>
+<!--<script src="https://g200kg.github.io/webaudio-controls/webaudio-controls.js"></script>-->
+<script src="./audioworklet-noisenode.js"></script>
+<script src="./audioworklet-adsrnode.js"></script>
+<script src="./audioworklet-shnode.js"></script>
+<script src="./webmodular2.js"></script>
+<style>
+.audiowide-regular {
+  font-family: "Audiowide", sans-serif;
+  font-weight: 400;
+  font-style: normal;
+}
+html {
+  margin:0;
+  padding:0;
+}
+body {
+  font-family: 'Yu Gothic';
+  margin: 0;
+  padding: 0;
+  position:relative;
+  color:#ccf;
+  box-sizing: border-box;
+}
+h1 {
+  color:#ccf;
+  margin: 10px;
+}
+.subt {
+  color:#ccf;
+}
+#splash {
+  position:absolute;
+  width:100%;
+  height:100%;
+  top:0;
+  bottom:0;
+  background:rgba(0, 0, 0, 0.5);
+  text-align: center;
+  z-index: 1;
+}
+#splashbutton {
+  position:absolute;
+  width:20%;
+  height:10%;
+  top:45%;
+  left:40%;
+  z-index: 1;
+  font-size:16px;
+}
+#header {
+  background:#55a;
+  display:flex;
+}
+#header a {
+  color:#ccf;
+}
+#header img {
+  margin:10px;
+}
+#main {
+  position:relative;
+  background:#334;
+}
+#base {
+  position:relative;
+}
+#rack {
+  position:relative;
+  background: #223;
+  margin:auto;
+  width:1200px;
+  height:780px;
+  display:flex;
+  padding:8px;
+  box-sizing: border-box;
+}
+#cablepane {
+  position:absolute;
+  margin:auto;
+  left:0;
+  right:0;
+  top:0;
+  width:1200px;
+  height:780px;
+  background:rgba(0,0,0,0);
+  pointer-events: none;
+  box-sizing: border-box;
+}
+#menupane {
+  display:none;
+  position:absolute;
+  top:0;
+  left:0;
+  right:0;
+  margin:auto;
+  width:1200px;
+  height:780px;
+  box-sizing: border-box;
+}
+#kbdframe {
+  position:absolute;
+  left:50px;
+  top:600px;
+  width:600px;
+  height:150px;
+  background:#368;
+}
+#kbd {
+  position:absolute;
+  left:20px;
+  top:10px;
+}
+#menu {
+  position:absolute;
+  top:10;
+  left:10;
+  width:120px;
+  height:40px;
+  background:#ccf;
+  color:#000;
+  text-align:center;
+  border:1px solid #000;
+}
+.menuitem {
+  width:120px;
+  height:30px;
+  margin:0;
+}
+.module {
+  display:flex;
+  position:relative;
+  flex-direction: column;
+  background: #368;
+  background:linear-gradient(90deg, #368, #257);
+  width:100px;
+  height:550px;
+  border:1px solid #000;
+  color:#fff;
+  user-select: none;
+  font-size:11px;
+}
+.title {
+  font-size:11px;
+  width:100%;
+  height:20px;
+  text-align:center;
+  background:#448;
+  position:absolute;
+}
+.text {
+  font-size:11px;
+  line-height:12px;
+  text-align: center;
+  color:#ddf;
+  translate:-50%;
+  position:absolute;
+  white-space:nowrap;
+}
+.scope {
+  background:#000;
+  position:absolute;
+  border-radius: 8px;
+}
+.kbd {
+
+}
+webaudio-slider {
+  position:absolute;
+  translate:-50%;
+}
+.submod {
+  display:block;
+  width:100%;
+  height:20px;
+  text-align:center;
+  background:#448;
+}
+.modtitle {
+  background:#444;
+  height:28px;
+  padding-left:8px;
+  position:relative;
+}
+.modtitle>div {
+  position:absolute;
+  top:0px;
+  right:4px;
+  color:#000;
+}
+.input , .output {
+  position:absolute;
+  width:16px;
+  height:16px;
+  background:#000;
+  border-radius: 8px;
+  border:3px solid #ccc;
+  translate: -8px -8px;
+  box-sizing: border-box;
+  box-shadow: 0px 0px 0px 3px rgba(0, 0, 0, 0.5);
+  cursor:pointer;
+}
+</style>
+</head>
+<body>
+  <div id="header">
+    <a href="https://www.g200kg.com/" target="_blank">
+    <img src="./images/g200kg160x80.png"></a>
+    <div>
+      <h1 class="audiowide-regular">Web Modular 2</h1>
+      <div class="subt">GitHub : <a href="https://github.com/g200kg/webmodular2" target="_blank">https://github.com/g200kg/webmodular2</a></div>
+    </div>
+  </div>
+  <div id="main">
+  <div id="splash">
+    <button id="splashbutton">Start</button>
+  </div>
+    <div>
+      <button onclick="rack.save()">Save to local file</button>
+      <button onclick="rack.load()">Load from local file</button>
+      <button onclick="rack.clear()">Clear</button>
+      <select id="demo"></select><button onclick="rack.loadDemo()">Set</button>
+    </div>
+    <div id="base">
+      <div id="rack"></div>
+      <canvas id="cablepane" width="1200" height="780"></canvas>
+      <div id="menupane">
+        <div id="menu">
+          <button class="menuitem" id="menuok">Disconnect</button>
+          <button class="menuitem" id="menucancel">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
