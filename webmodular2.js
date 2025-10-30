@@ -110,65 +110,8 @@ class Param {
                 inner += `<div class="text" style="position:absolute;top:${param.ly}px;left:${param.lx}px">${param.l}</div>`;
             inner += "</div>";
             this.elm.innerHTML = inner;
-            this.elm.addEventListener("pointerdown",(e)=>{
-                const pt = this.getPt(e);
-                if(e.target.className == "input" || e.target.className == "output") {
-                    this.elm.setPointerCapture(e.pointerId);
-                    this.drag = e.target.id;
-                    this.click = true;
-                }
-            });
-            this.elm.addEventListener("pointerup", (e)=>{
-                if(this.drag) {
-                    const param2 = rack.findJack(e.clientX, e.clientY);
-                    if(param2) {
-                        if(this.type == "output" && param2.type == "input") {
-                            rack.connect(this, param2);
-                        }
-                        else if(this.type == "input" && param2.type == "output") {
-                            rack.connect(param2, this);
-                        }
-                    }
-                    this.drag = null;
-                    rack.draw();
-                }
-            });
-            this.elm.addEventListener("pointermove", (e)=>{
-                this.click = false;
-                if(this.drag) {
-                    const ptCur = this.getPt(e);
-                    const ptFrom = this.getPt(this);
-                    rack.draw();
-                    cable.drawCable(ptFrom.x, ptFrom.y, ptCur.x, ptCur.y);
-                    const param2 = rack.findJack(e.pageX, e.pageY);
-                    if(param2) {
-                        if((this.type == "output" && param2.type == "input") || (this.type == "input" && param2.type == "output"))
-                            cable.drawMark(ptCur.x, ptCur.y, 1);
-                        else if(param2.type == "input" || param2.type == "output")
-                            cable.drawMark(ptCur.x, ptCur.y, 0);
-                    }
-                }
-            });
-            this.elm.addEventListener("click", (e)=>{
-                if(this.click) {
-                    const ptCur = this.getPt(e);
-                    const mstyle = document.getElementById("menu").style;
-                    document.getElementById("menupane").style.display = "block";
-                    rack.focus = this;
-                    mstyle.top = ptCur.y+"px";
-                    mstyle.left = ptCur.x+"px";
-                    this.click = false;
-                }
-            });
             break;
         }
-    }
-    getPt(e) {
-        const rpos = document.getElementById("cablepane").getBoundingClientRect();
-        const mpos = this.mod.div.getBoundingClientRect();
-        if(e.offsetX!=undefined)
-            return {x:e.offsetX + mpos.left - rpos.left, y:e.offsetY + mpos.top - rpos.top};
-        return {x:e.x + mpos.left - rpos.left, y:e.y + mpos.top - rpos.top};
     }
     getParam() {
         let v;
@@ -713,7 +656,7 @@ class MISC extends Module {
 }
 class KEYBOARD extends Module {
     constructor(rack, name) {
-        super(name, 950,170,20,600);
+        super(name, 950,150,20,580);
         this.rack = rack;
         this.type = "KBD";
         this.nodeCV = new ConstantSourceNode(this.rack.actx, {offset:0});
@@ -724,10 +667,10 @@ class KEYBOARD extends Module {
         this.glideVal = 0;
         this.loop = 0;
         this.addElm({type:"title", label:"KEYBOARD", x:0, y:0});
-        this.addParam({type:"output", class:"cv", x:530, y:30, md:"d", l:"CV", lx:530, ly:65, target:this.nodeCV});
-        this.addParam({type:"output", class:"gt", x:560, y:30, md:"d", l:"Gate", lx:560, ly:65, target:this.nodeGate});
-        this.addParam({type:"knob", class:"Gl", x:525, y:90, d:45, val:0, min:0, max:100, step:1, l:"Glide", lx:545, ly:140});
-        this.addElm({type:"keyboard", id:"keyboard", x:20, y:50});
+        this.addParam({type:"output", class:"cv", x:530, y:30, md:"d", l:"CV", lx:530, ly:60, target:this.nodeCV});
+        this.addParam({type:"output", class:"gt", x:560, y:30, md:"d", l:"Gate", lx:560, ly:60, target:this.nodeGate});
+        this.addParam({type:"knob", class:"Gl", x:540, y:80, d:45, val:0, min:0, max:100, step:1, l:"Glide", lx:515, ly:90});
+        this.addElm({type:"keyboard", id:"keyboard", x:20, y:45});
         this.addElm({type:"text", label:"MML", x:600, y:30});
         this.addParam({type:"mml", class:"Mml", x:600, y:55, val:""});
         this.addParam({type:"switch", class:"Play", x:650, y:24, val:0, temp:1, l:"", lx:650, ly:140, src:"images/play.png", w:80, h:27});
@@ -798,25 +741,87 @@ class Rack {
             this.disconnect(this.focus);
         });
         this.connection = {};
-        this.rackElm.addEventListener("pointermove", (ev)=>{
-//            console.log("ev", ev.clientX, ev.clientY);
-//            const px = ev.clientX - rc.left - 30;
-//            const py = ev.clientY - rc.top - 30;
-//            const rc = this.rackElm.getBoundingClientRect();
-//            rack.draw();
-//            const imgd = cable.ctx.getImageData(px, py, 60, 60);
-//            for(let y = 0; y < 60; ++y) {
-//                for(let x = 0; x < 60; ++x) {
-//                    imgd.data[(x + y*60)*4 + 3] *= 0.1;
-//                }
-//            }
-//            cable.ctx.putImageData(imgd, px, py);
-        });
         for(let k in demoPatch) {
             const o = document.createElement("option");
             o.innerText = k;
             document.getElementById("demo").appendChild(o);
         }
+
+        this.rackElm.addEventListener("pointerdown",(e)=>{
+            const pt = this.getPt(e);
+            if(e.target.className == "input" || e.target.className == "output") {
+                this.focus = this.click = this.drag = this.findJack(e.clientX, e.clientY);
+            }
+        });
+        this.rackElm.addEventListener("pointerup", (e)=>{
+            if(this.drag) {
+                const param2 = rack.findJack(e.clientX, e.clientY);
+                if(param2) {
+                    if(this.drag.type == "output" && param2.type == "input") {
+                        rack.connect(this.drag, param2);
+                    }
+                    else if(this.drag.type == "input" && param2.type == "output") {
+                        rack.connect(param2, this.drag);
+                    }
+                }
+                this.drag = null;
+                rack.draw();
+            }
+        });
+        this.rackElm.addEventListener("pointermove", (e)=>{
+            this.click = null;
+            const ptCur = this.getPt(e);
+            let ptFrom = null;
+            let param2 = null;
+            if(this.drag) {
+                ptFrom = this.getPt(this.drag);
+                rack.draw();
+                param2 = rack.findJack(e.clientX, e.clientY);
+            }
+            else {
+                rack.draw();
+            }
+            cable.ctx.globalCompositeOperation = "destination-out";
+            cable.ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
+            for(let r = 50; r > 0; r -= 8) {
+                cable.ctx.beginPath();
+                cable.ctx.arc(ptCur.x, ptCur.y, r, 0, Math.PI * 2);
+                cable.ctx.fill();
+            }
+            cable.ctx.globalCompositeOperation = "source-over";
+            if(ptFrom)
+                cable.drawCable(ptFrom.x, ptFrom.y, ptCur.x, ptCur.y);
+            if(param2) {
+                if((this.drag.type == "output" && param2.type == "input") || (this.drag.type == "input" && param2.type == "output"))
+                    cable.drawMark(ptCur.x, ptCur.y, 1);
+                else if(param2.type == "input" || param2.type == "output")
+                    cable.drawMark(ptCur.x, ptCur.y, 0);
+            }
+        });
+        this.rackElm.addEventListener("click", (e)=>{
+            if(this.click) {
+                const ptCur = this.getPt(e);
+                const mstyle = document.getElementById("menu").style;
+                document.getElementById("menupane").style.display = "block";
+                mstyle.top = ptCur.y+"px";
+                mstyle.left = ptCur.x+"px";
+                this.click = false;
+            }
+        });
+    }
+    getPt(e) {
+        if(e instanceof Param) {
+            const rpos = document.getElementById("cablepane").getBoundingClientRect();
+            const mpos = e.mod.div.getBoundingClientRect();
+            return {x:e.x + mpos.left - rpos.left, y:e.y + mpos.top - rpos.top};
+        }
+        const rc = this.rackElm.getBoundingClientRect();
+        return {x:e.clientX - rc.left, y:e.clientY - rc.top};
+        const rpos = document.getElementById("cablepane").getBoundingClientRect();
+        const mpos = this.mod.div.getBoundingClientRect();
+        if(e.offsetX!=undefined)
+            return {x:e.offsetX + mpos.left - rpos.left, y:e.offsetY + mpos.top - rpos.top};
+        return {x:e.x + mpos.left - rpos.left, y:e.y + mpos.top - rpos.top};
     }
     start() {
         console.log("rack.start");
@@ -830,11 +835,8 @@ class Rack {
     }
     findJack(x, y) {
         const elm = document.elementFromPoint(x,y);
-        if(elm) {
-            const param2 = elm.parentNode.parentNode.param;
-            if(param2 && (param2.type == "input" || param2.type == "output")) {
-                return param2;
-            }
+        if(elm.className == "input" || elm.className == "output") {
+            return elm.parentNode.parentNode.param;
         }
         return null;
     }
@@ -985,7 +987,6 @@ class Cable {
     }
     drawCable(x1, y1, x2, y2) {
         const mx = (x1 + x2) * 0.5;
-//        const my = (y1 + y2) * 0.5;
         const my = Math.max(y1, y2);
         cable.ctx.lineWidth = 6;
         cable.ctx.lineCap = "round";
