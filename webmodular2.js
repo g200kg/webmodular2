@@ -783,7 +783,7 @@ class Rack {
             }
             cable.ctx.globalCompositeOperation = "destination-out";
             cable.ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
-            for(let r = 50; r > 0; r -= 8) {
+            for(let r = 40; r > 0; r -= 8) {
                 cable.ctx.beginPath();
                 cable.ctx.arc(ptCur.x, ptCur.y, r, 0, Math.PI * 2);
                 cable.ctx.fill();
