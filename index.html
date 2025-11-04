@@ -14,7 +14,7 @@ WebAudioControlsOptions={
     paramHeight:14,
     paramColors:"#eee;#124;#fcc",
     sliderWidth:18,
-    sliderHeight:90,
+    sliderHeight:80,
     switchWidth:20,
     switchHeight:20,
 };
@@ -134,7 +134,18 @@ h1 {
   left:20px;
   top:10px;
 }
-#menu {
+#menuCable {
+  position:absolute;
+  top:10;
+  left:10;
+  width:120px;
+  height:40px;
+  background:#ccf;
+  color:#000;
+  text-align:center;
+  border:1px solid #000;
+}
+#menuModule {
   position:absolute;
   top:10;
   left:10;
@@ -185,8 +196,16 @@ h1 {
   position:absolute;
   border-radius: 8px;
 }
-.kbd {
-
+.modopt {
+  width:20px;
+  height:20px;
+  position:absolute;
+  top:0px;
+  right:0px;
+  background:#238;
+  color:#ccf;
+  border-radius: 4px;
+  cursor:pointer;
 }
 webaudio-slider {
   position:absolute;
@@ -248,9 +267,14 @@ webaudio-slider {
       <div id="rack"></div>
       <canvas id="cablepane" width="1200" height="780"></canvas>
       <div id="menupane">
-        <div id="menu">
-          <button class="menuitem" id="menuok">Disconnect</button>
-          <button class="menuitem" id="menucancel">Cancel</button>
+        <div id="menuCable">
+          <button class="menuitem" id="menuCDisconnect">Disconnect</button>
+          <button class="menuitem" id="menuCCancel">Cancel</button>
+        </div>
+        <div id="menuModule">
+          <button class="menuitem" id="menuMDel">Del</button>
+          <button class="menuitem" id="menuMLeft">Move Left</button>
+          <button class="menuitem" id="menuMCancel">Cancel</button>
         </div>
       </div>
     </div>

@@ -8,6 +8,9 @@ const svgWavSaw = '<svg width="16" height="10" stroke-width="1.5" stroke="#ccf" 
 const svgWavSawR = '<svg width="16" height="10" stroke-width="1.5" stroke="#ccf" fill="none"><path d="M 1 5 L 1 9 L 15 1 L 15 5"/></svg>';
 const svgWavSqr = '<svg width="16" height="10" stroke-width="1.5" stroke="#ccf" fill="none"><path d="M 1 5 L 1 1 L 8 1 L 8 9 L 15 9 L 15 5"/></svg>';
 const svgWavSin = '<svg width="16" height="10" stroke-width="1.5" stroke="#ccf" fill="none"><path d="M 0 5 L 2.5 1.5 L 3.75 1 L 5 1.5 L 7.5 5 L 10 8.5 L 11.25 9 L 12.5 8.5 L 15 5"/></svg>';
+const svgEg = '<svg width="16" height="10" stroke-width="1.5" stroke="#ccf" fill="none"><path d="M 1 9 L 3 1 L 5 5 L 12 5 L 15 9"/></svg>';
+const svgEgR = '<svg width="16" height="10" stroke-width="1.5" stroke="#ccf" fill="none"><path d="M 1 1 L 3 9 L 5 5 L 12 5 L 15 1"/></svg>';
+const svgDropMenu = '<svg width="20" height="20" stroke-width="1.5" stroke="#ccf" fill="none"><path d="M 4 8 L 10 15 L 16 8"/></svg>';
 
 const demoPatch = 
     {
@@ -169,15 +172,26 @@ class Module {
         else
             this.div.style = `position:relative;width:${w}px;height:${h}px`;
         if(name)
-            this.id = name;
+            this.id = this.div.id = name;
         else
-            this.id = modSerial++;
+            this.id = this.div.id = modSerial++;
         this.title = "Module";
     }
     addElm(arg) {
         let elm, s, h;
         switch(arg.type) {
         case "title":
+            elm = document.createElement("div");
+            s = arg.label;
+            if(arg.opt) {
+                s += `<div class="modopt">\u25bc</div>`;
+            }
+            elm.id = this.id + ".m";
+            elm.innerHTML = s;
+            elm.className = arg.type;
+            elm.style = `left:${arg.x}px;top:${arg.y}px`;
+            this.div.appendChild(elm);
+            break;
         case "text":
             elm = document.createElement("div");
             elm.innerHTML = arg.label;
@@ -204,6 +218,13 @@ class Module {
             elm.style = `left:${arg.x}px;top:${arg.y}px;width:470px;height:90px`;
             this.div.appendChild(elm);
             break;
+        case "modopt":
+            elm = document.createElement("div");
+            elm.innerHTML = arg.label;
+            elm.className = arg.type;
+            elm.style = `left:${arg.x}px;top:${arg.y}px;border:1px solid #f00`;
+            this.div.appendChild(elm);
+            break;
         }
     }
     addParam(param) {
@@ -223,28 +244,42 @@ class Module {
 }
 class OUTMIX extends Module {
     constructor(rack, name) {
-        super(name,130,560);
+        super(name,130,540);
         this.rack = rack;
         this.type = "OUT";
         this.ar = new Uint8Array(100);
-        this.nodeOut = new GainNode(this.rack.actx, {gain:0.5});
-        this.nodeComp = new DynamicsCompressorNode(this.rack.actx);
+        const blen = rack.actx.sampleRate*.5|0;
+        this.convBuf = new AudioBuffer({length:blen, numberOfChannels:2, sampleRate:rack.actx.sampleRate});
+        const d1 = this.convBuf.getChannelData(0);
+        const d2 = this.convBuf.getChannelData(1);
+        for(let i = 0; i < blen; ++i) {
+            if(i/blen < Math.random()) {
+                d1[i] = Math.exp(-3*i/blen)*(Math.random()-.5)*.5;
+                d2[i] = Math.exp(-3*i/blen)*(Math.random()-.5)*.5;
+            }
+        }
+        this.nodeOut = new GainNode(this.rack.actx);
         this.nodeAnalyser = new AnalyserNode(this.rack.actx);
-        this.nodeOut.connect(this.rack.actx.destination);
-        this.nodeComp.connect(this.nodeAnalyser).connect(this.nodeOut);
+        this.nodeConv = new ConvolverNode(this.rack.actx, {buffer:this.convBuf});
+        this.nodeRev = new GainNode(this.rack.actx);
+        this.nodeRevR = new GainNode(this.rack.actx);
+        this.nodeComp = new DynamicsCompressorNode(this.rack.actx);
         this.nodeI1 = new GainNode(this.rack.actx, {gain:1});
         this.nodeI1.connect(this.nodeComp);
         this.nodeI2 = new GainNode(this.rack.actx, {gain:0});
         this.nodeI2.connect(this.nodeComp);
         this.nodeI3 = new GainNode(this.rack.actx, {gain:0});
         this.nodeI3.connect(this.nodeComp);
+        this.nodeComp.connect(this.nodeRevR).connect(this.nodeAnalyser).connect(this.nodeOut).connect(this.rack.actx.destination);
+        this.nodeComp.connect(this.nodeConv).connect(this.nodeRev).connect(this.nodeAnalyser);
         this.addElm({type:"title", label:"OUTMIX", x:0, y:0});
         this.addElm({type:"text", label:"\u250f\u2501 Input \u2501\u2513", x:50, y:25});
         this.addElm({type:"scope", id:"outmix.scope", x:13, y:210});
-        this.addParam({type:"slider", class:"I1", x:20, y:77, min:0, max:100, step:1, val:50, l:"1", lx:20, ly:167});
-        this.addParam({type:"slider", class:"I2", x:50, y:77, min:0, max:100, step:1, val:0, l:"2", lx:50, ly:167});
-        this.addParam({type:"slider", class:"I3", x:80, y:77, min:0, max:100, step:1, val:0, l:"3", lx:80, ly:167});
-        this.addParam({type:"slider", class:"M", x:110, y:77, min:0, max:100, step:1, val:20, l:"Main", lx:110, ly:167});
+        this.addParam({type:"slider", class:"I1", x:20, y:77, min:0, max:100, step:1, val:50, l:"1", lx:20, ly:157});
+        this.addParam({type:"slider", class:"I2", x:50, y:77, min:0, max:100, step:1, val:0, l:"2", lx:50, ly:157});
+        this.addParam({type:"slider", class:"I3", x:80, y:77, min:0, max:100, step:1, val:0, l:"3", lx:80, ly:157});
+        this.addParam({type:"slider", class:"M", x:110, y:77, min:0, max:100, step:1, val:20, l:"Main", lx:110, ly:157});
+        this.addParam({type:"knob", class:"Rev", x:70, y:350, d:45, min:0, max:100, step:1, val:50, l:"Reverb", lx:40, ly:360});
         this.addParam({type:"input", class:"i1", x:20, y:63, md:"u", target:this.nodeI1});
         this.addParam({type:"input", class:"i2", x:50, y:63, md:"u", target:this.nodeI2});
         this.addParam({type:"input", class:"i3", x:80, y:63, md:"u", target:this.nodeI3});
@@ -271,11 +306,19 @@ class OUTMIX extends Module {
                 this['node'+ev.target.className].gain.value = ev.target.value * 0.01;
             }
         });
+        this.div.addEventListener("input", (ev)=>{
+            switch(ev.target.className) {
+            case "Rev":
+                this.nodeRev.gain.value = ev.target.value * 0.01;
+                this.nodeRevR.gain.value = (100 - ev.target.value) * 0.01;
+                break;
+            }
+        });
     }
 }
 class VCO extends Module {
     constructor(rack, name) {
-        super(name, 100,560);
+        super(name, 100,540);
         this.rack = rack;
         this.type = "VCO";
         this.wavCurveClip = new Float32Array(256);
@@ -305,31 +348,31 @@ class VCO extends Module {
         this.nodeM1.connect(this.nodeOsc.detune);
         this.nodeM2.connect(this.nodeOsc.detune);
         this.nodeM3.connect(this.nodeOsc.detune);
-        this.addElm({type:"title", label:"VCO", x:0, y:0});
+        this.addElm({type:"title", label:"VCO", x:0, y:0, opt:0});
         this.addParam({type:"output", class:"o", x:80, y:63, l:"Out", lx:80, ly:25, md:"u", target:this.nodeOut});
         this.addParam({type:"input", class:"pi", x:20, y:63, l:"Pwm", lx:20, ly:25, md:"u", target:this.nodePwmMod});
-        this.addParam({type:"slider", class:"PM", x:20, y:77, val:0, min:0, max:100, step:1, l:"Mod", lx:20, ly:167});
-        this.addParam({type:"slider", class:"PMn", x:50, y:77, val:0, min:0, max:100, step:1, l:"Man", lx:50, ly:167});
-        this.addParam({type:"switch", class:"POn", x:80, y:145, val:0, l:"On", lx:80, ly:167});
-        this.addElm({type:"text", label:"\u2517\u2501 Pwm \u2501\u251b", x:50, y:180});
-        this.addParam({type:"slider", class:"Oct", x:20, y:215, h:50, val:0, min:-2, max:2, step:1, l:"Oct", lx:30, ly:200});
-        this.addElm({type:"text", label:"+2", x:37, y:215});
-        this.addElm({type:"text", label:"0", x:37, y:233});
-        this.addElm({type:"text", label:"-2", x:37, y:251});
-        this.addParam({type:"slider", class:"Frm", x:60, y:215, h:50, val:0, min:0, max:3, step:1, l:"Form", lx:80, ly:200});
-        this.addElm({type:"text", label:svgWavTri, x:85, y:215});
-        this.addElm({type:"text", label:svgWavSaw, x:85, y:227});
-        this.addElm({type:"text", label:svgWavSqr, x:85, y:239});
-        this.addElm({type:"text", label:svgWavSin, x:85, y:251});
-        this.addParam({type:"knob", class:"Tun", x:50, y:275, d:45, val:0, min:-24, max:24, step:1, vx:10, vy:305, l:"Tune", lx:20, ly:280});
-        this.addParam({type:"knob", class:"Fin", x:50, y:335, d:45, val:0, min:-200, max:200, step:1, vx:10, vy:365, l:"Fine", lx:20, ly:340});
-        this.addParam({type:"slider", class:"M1", x:20, y:395, val:100, min:0, max:100, step:1});
-        this.addParam({type:"slider", class:"M2", x:50, y:395, val:0, min:0, max:100, step:1});
-        this.addParam({type:"slider", class:"M3", x:80, y:395, val:0, min:0, max:100, step:1});
-        this.addParam({type:"input", class:"m1", x:20, y:498, l:"1", lx:20, ly:522, target:this.nodeM1});
-        this.addParam({type:"input", class:"m2", x:50, y:498, l:"2", lx:50, ly:522, target:this.nodeM2});
-        this.addParam({type:"input", class:"m3", x:80, y:498, l:"3", lx:80, ly:522, target:this.nodeM3});
-        this.addElm({type:"text", label:"\u2517\u2501 Mod \u2501\u251b", x:50, y:535});
+        this.addParam({type:"slider", class:"PM", x:20, y:77, val:0, min:0, max:100, step:1, l:"Mod", lx:20, ly:157});
+        this.addParam({type:"slider", class:"PMn", x:50, y:77, val:0, min:0, max:100, step:1, l:"Man", lx:50, ly:157});
+        this.addParam({type:"switch", class:"POn", x:80, y:135, val:0, l:"On", lx:80, ly:157});
+        this.addElm({type:"text", label:"\u2517\u2501 Pwm \u2501\u251b", x:50, y:170});
+        this.addParam({type:"slider", class:"Oct", x:20, y:205, h:50, val:0, min:-2, max:2, step:1, l:"Oct", lx:30, ly:190});
+        this.addElm({type:"text", label:"+2", x:37, y:205});
+        this.addElm({type:"text", label:"0", x:37, y:223});
+        this.addElm({type:"text", label:"-2", x:37, y:241});
+        this.addParam({type:"slider", class:"Frm", x:60, y:205, h:50, val:0, min:0, max:3, step:1, l:"Form", lx:80, ly:190});
+        this.addElm({type:"text", label:svgWavTri, x:85, y:205});
+        this.addElm({type:"text", label:svgWavSaw, x:85, y:217});
+        this.addElm({type:"text", label:svgWavSqr, x:85, y:229});
+        this.addElm({type:"text", label:svgWavSin, x:85, y:241});
+        this.addParam({type:"knob", class:"Tun", x:50, y:265, d:45, val:0, min:-24, max:24, step:1, vx:10, vy:295, l:"Tune", lx:20, ly:270});
+        this.addParam({type:"knob", class:"Fin", x:50, y:325, d:45, val:0, min:-200, max:200, step:1, vx:10, vy:355, l:"Fine", lx:20, ly:330});
+        this.addParam({type:"slider", class:"M1", x:20, y:385, val:100, min:0, max:100, step:1});
+        this.addParam({type:"slider", class:"M2", x:50, y:385, val:0, min:0, max:100, step:1});
+        this.addParam({type:"slider", class:"M3", x:80, y:385, val:0, min:0, max:100, step:1});
+        this.addParam({type:"input", class:"m1", x:20, y:478, l:"1", lx:20, ly:502, target:this.nodeM1});
+        this.addParam({type:"input", class:"m2", x:50, y:478, l:"2", lx:50, ly:502, target:this.nodeM2});
+        this.addParam({type:"input", class:"m3", x:80, y:478, l:"3", lx:80, ly:502, target:this.nodeM3});
+        this.addElm({type:"text", label:"\u2517\u2501 Mod \u2501\u251b", x:50, y:515});
         this.div.addEventListener("change", (ev)=>{
             if(ev.target.className == "POn") {
                 if(ev.target.value != this.pwmOn) {
@@ -377,7 +420,7 @@ class VCO extends Module {
 }
 class VCF extends Module {
     constructor(rack, name) {
-        super(name, 100,560);
+        super(name, 100,540);
         this.rack = rack;
         this.type = "VCF";
         this.nodeFilter = new BiquadFilterNode(this.rack.actx);
@@ -393,28 +436,28 @@ class VCF extends Module {
         this.nodeM1.connect(this.nodeFilter.detune);
         this.nodeM2.connect(this.nodeFilter.detune);
         this.nodeM3.connect(this.nodeFilter.detune);
-        this.addElm({type:"title", label:"VCF", x:0, y:0});
+        this.addElm({type:"title", label:"VCF", x:0, y:0, opt:0});
         this.addElm({type:"text", label:"\u250f\u2501 Input \u2501\u2513", x:50, y:25});
         this.addParam({type:"input", class:"i1", x:20, y:63, md:"u", target:this.nodeI1});
         this.addParam({type:"input", class:"i2", x:50, y:63, md:"u", target:this.nodeI2});
         this.addParam({type:"input", class:"i3", x:80, y:63, md:"u", target:this.nodeI3});
-        this.addParam({type:"slider", class:"I1", x:20, y:77, val:100, min:0, max:100, step:1, l:"1", lx:20, ly:167});
-        this.addParam({type:"slider", class:"I2", x:50, y:77, val:0, min:0, max:100, step:1, l:"2", lx:50, ly:167});
-        this.addParam({type:"slider", class:"I3", x:80, y:77, val:0, min:0, max:100, step:1, l:"3", lx:80, ly:167});
-        this.addParam({type:"knob", class:"Frq", x:50, y:215, d:45, val:0, min:-24, max:24, step:1, vx:10, vy:245, l:"Freq", lx:20, ly:220});
-        this.addParam({type:"knob", class:"Res", x:50, y:275, d:45, val:0, min:0, max:50, step:1, vx:10, vy:305, l:"Reso", lx:20, ly:280});
-        this.addParam({type:"slider", class:"Typ", x:20, y:330, h:50, val:0, min:0, max:2, step:1});
-        this.addElm({type:"text", label:"HP", x:40, y:330});
-        this.addElm({type:"text", label:"BP", x:40, y:347});
-        this.addElm({type:"text", label:"LP", x:40, y:364});
-        this.addParam({type:"output", class:"o", x:80, y:368, l:"Out", lx:80, ly:330, md:"u", target:this.nodeFilter});
-        this.addParam({type:"slider", class:"M1", x:20, y:395, val:100, min:0, max:100, step:1});
-        this.addParam({type:"slider", class:"M2", x:50, y:395, val:0, min:0, max:100, step:1});
-        this.addParam({type:"slider", class:"M3", x:80, y:395, val:0, min:0, max:100, step:1});
-        this.addParam({type:"input", class:"m1", x:20, y:498, l:"1", lx:20, ly:522, target:this.nodeM1});
-        this.addParam({type:"input", class:"m2", x:50, y:498, l:"2", lx:50, ly:522, target:this.nodeM2});
-        this.addParam({type:"input", class:"m3", x:80, y:498, l:"3", lx:80, ly:522, target:this.nodeM3});
-        this.addElm({type:"text", label:"\u2517\u2501 Mod \u2501\u251b", x:50, y:535});
+        this.addParam({type:"slider", class:"I1", x:20, y:77, val:100, min:0, max:100, step:1, l:"1", lx:20, ly:157});
+        this.addParam({type:"slider", class:"I2", x:50, y:77, val:0, min:0, max:100, step:1, l:"2", lx:50, ly:157});
+        this.addParam({type:"slider", class:"I3", x:80, y:77, val:0, min:0, max:100, step:1, l:"3", lx:80, ly:157});
+        this.addParam({type:"knob", class:"Frq", x:50, y:205, d:45, val:0, min:-24, max:24, step:1, vx:10, vy:235, l:"Freq", lx:20, ly:210});
+        this.addParam({type:"knob", class:"Res", x:50, y:265, d:45, val:0, min:0, max:50, step:1, vx:10, vy:295, l:"Reso", lx:20, ly:270});
+        this.addParam({type:"slider", class:"Typ", x:20, y:320, h:50, val:0, min:0, max:2, step:1});
+        this.addElm({type:"text", label:"HP", x:40, y:320});
+        this.addElm({type:"text", label:"BP", x:40, y:337});
+        this.addElm({type:"text", label:"LP", x:40, y:354});
+        this.addParam({type:"output", class:"o", x:80, y:358, l:"Out", lx:80, ly:320, md:"u", target:this.nodeFilter});
+        this.addParam({type:"slider", class:"M1", x:20, y:385, val:100, min:0, max:100, step:1});
+        this.addParam({type:"slider", class:"M2", x:50, y:385, val:0, min:0, max:100, step:1});
+        this.addParam({type:"slider", class:"M3", x:80, y:385, val:0, min:0, max:100, step:1});
+        this.addParam({type:"input", class:"m1", x:20, y:478, l:"1", lx:20, ly:502, target:this.nodeM1});
+        this.addParam({type:"input", class:"m2", x:50, y:478, l:"2", lx:50, ly:502, target:this.nodeM2});
+        this.addParam({type:"input", class:"m3", x:80, y:478, l:"3", lx:80, ly:502, target:this.nodeM3});
+        this.addElm({type:"text", label:"\u2517\u2501 Mod \u2501\u251b", x:50, y:515});
         this.div.addEventListener("input", (ev)=>{
             switch(ev.target.className) {
             case "I1": case "I2": case "I3":
@@ -438,7 +481,7 @@ class VCF extends Module {
 }
 class VCA extends Module {
     constructor(rack, name) {
-        super(name, 100,560);
+        super(name, 100,540);
         this.rack = rack;
         this.type = "VCA";
         this.offset = 0;
@@ -461,25 +504,25 @@ class VCA extends Module {
         this.nodeM1.connect(this.nodeGain1.gain);
         this.nodeM2.connect(this.nodeGain1.gain);
         this.nodeM3.connect(this.nodeGain1.gain);
-        this.addElm({type:"title", label:"VCA", x:0, y:0});
+        this.addElm({type:"title", label:"VCA", x:0, y:0, opt:0});
         this.addElm({type:"text", label:"\u250f\u2501 Input \u2501\u2513", x:50, y:25});
         this.addParam({type:"input", class:"i1", x:20, y:63, md:"u", target:this.nodeI1});
         this.addParam({type:"input", class:"i2", x:50, y:63, md:"u", target:this.nodeI2});
         this.addParam({type:"input", class:"i3", x:80, y:63, md:"u", target:this.nodeI3});
-        this.addParam({type:"slider", class:"I1", x:20, y:77, val:100, min:0, max:100, step:1, l:"1", lx:20, ly:167});
-        this.addParam({type:"slider", class:"I2", x:50, y:77, val:0, min:0, max:100, step:1, l:"2", lx:50, ly:167});
-        this.addParam({type:"slider", class:"I3", x:80, y:77, val:0, min:0, max:100, step:1, l:"3", lx:80, ly:167});
-        this.addParam({type:"knob", class:"Off", x:50, y:215, d:45, val:0, min:0, max:100, step:1, vx:10, vy:245, l:"Offset", lx:20, ly:220});
+        this.addParam({type:"slider", class:"I1", x:20, y:77, val:100, min:0, max:100, step:1, l:"1", lx:20, ly:157});
+        this.addParam({type:"slider", class:"I2", x:50, y:77, val:0, min:0, max:100, step:1, l:"2", lx:50, ly:157});
+        this.addParam({type:"slider", class:"I3", x:80, y:77, val:0, min:0, max:100, step:1, l:"3", lx:80, ly:157});
+        this.addParam({type:"knob", class:"Off", x:50, y:205, d:45, val:0, min:0, max:100, step:1, vx:10, vy:235, l:"Offset", lx:20, ly:210});
         this.addParam({type:"output", class:"o",x:80, y:323, l:"Out", lx:80, ly:285, md:"u", target:this.nodeGain3});
-        this.addParam({type:"switch", class:"And1", x:35, y:370, val:0, l:"And", lx:50, ly:355});
-        this.addParam({type:"switch", class:"And2", x:65, y:370, val:0});
-        this.addParam({type:"slider", class:"M1", x:20, y:395, val:100, min:0, max:100, step:1});
-        this.addParam({type:"slider", class:"M2", x:50, y:395, val:0, min:0, max:100, step:1});
-        this.addParam({type:"slider", class:"M3", x:80, y:395, val:0, min:0, max:100, step:1});
-        this.addParam({type:"input", class:"m1", x:20, y:498, l:"1", lx:20, ly:522, target:this.nodeM1});
-        this.addParam({type:"input", class:"m2", x:50, y:498, l:"2", lx:50, ly:522, target:this.nodeM2});
-        this.addParam({type:"input", class:"m3", x:80, y:498, l:"3", lx:80, ly:522, target:this.nodeM3});
-        this.addElm({type:"text", label:"\u2517\u2501 Mod \u2501\u251b", x:50, y:535});
+        this.addParam({type:"switch", class:"And1", x:35, y:360, val:0, l:"And", lx:50, ly:345});
+        this.addParam({type:"switch", class:"And2", x:65, y:360, val:0});
+        this.addParam({type:"slider", class:"M1", x:20, y:385, val:100, min:0, max:100, step:1});
+        this.addParam({type:"slider", class:"M2", x:50, y:385, val:0, min:0, max:100, step:1});
+        this.addParam({type:"slider", class:"M3", x:80, y:385, val:0, min:0, max:100, step:1});
+        this.addParam({type:"input", class:"m1", x:20, y:478, l:"1", lx:20, ly:502, target:this.nodeM1});
+        this.addParam({type:"input", class:"m2", x:50, y:478, l:"2", lx:50, ly:502, target:this.nodeM2});
+        this.addParam({type:"input", class:"m3", x:80, y:478, l:"3", lx:80, ly:502, target:this.nodeM3});
+        this.addElm({type:"text", label:"\u2517\u2501 Mod \u2501\u251b", x:50, y:515});
         this.div.addEventListener("change", (ev)=>{
             switch(ev.target.className) {
             case "And1":
@@ -529,25 +572,30 @@ class VCA extends Module {
 }
 class EG extends Module {
     constructor(rack, name) {
-        super(name, 130, 560);
+        super(name, 130, 540);
         this.rack = rack;
         this.type = "EG";
         this.nodeAdsr1 = new AdsrNode(this.rack.actx);
-        this.addElm({type:"title", label:"EG", x:0, y:0});
+        this.nodeR1 = new GainNode(this.rack.actx, {gain:-1});
+        this.nodeAdsr1.connect(this.nodeR1);
+        this.addElm({type:"title", label:"EG", x:0, y:0, opt:0});
         this.addParam({type:"slider", class:"A1", x:20, y:77, val:0, min:0, max:100, step:1, l:"A", lx:20, ly:167});
         this.addParam({type:"slider", class:"D1", x:50, y:77, val:0, min:0, max:100, step:1, l:"D", lx:50, ly:167});
         this.addParam({type:"slider", class:"S1", x:80, y:77, val:100, min:0, max:100, step:1, l:"S", lx:80, ly:167});
         this.addParam({type:"slider", class:"R1", x:110, y:77, val:1, min:0, max:100, step:1, l:"R", lx:110, ly:167});
         this.addParam({type:"input", class:"t1", x:20, y:63, md:"u", l:"Trig", lx:20, ly:25, target:this.nodeAdsr1.trigger});
-        this.addParam({type:"output", class:"o1", x:110, y:63, md:"u", l:"Out", lx:110, ly:25, target:this.nodeAdsr1});
+        this.addParam({type:"output", class:"o1", x:110, y:63, md:"u", l:svgEg, lx:110, ly:25, target:this.nodeAdsr1});
+        this.addParam({type:"output", class:"o1r", x:80, y:63, md:"u", l:svgEgR, lx:80, ly:25, target:this.nodeR1});
         this.nodeAdsr2 = new AdsrNode(this.rack.actx);
+        this.nodeR2 = new GainNode(this.rack.actx, {gain:-1});
         this.addElm({type:"title", label:"EG", x:0, y:260});
         this.addParam({type:"slider", class:"A2", x:20, y:337, val:0, min:0, max:100, step:1, l:"A", lx:20, ly:430});
         this.addParam({type:"slider", class:"D2", x:50, y:337, val:0, min:0, max:100, step:1, l:"D", lx:50, ly:430});
         this.addParam({type:"slider", class:"S2", x:80, y:337, val:100, min:0, max:100, step:1, l:"S", lx:80, ly:430});
         this.addParam({type:"slider", class:"R2", x:110, y:337, val:1, min:0, max:100, step:1, l:"R", lx:110, ly:430});
         this.addParam({type:"input", class:"t2", x:20, y:323, md:"u", l:"Trig", lx:20, ly:285, target:this.nodeAdsr2.trigger});
-        this.addParam({type:"output", class:"o2", x:110, y:323, md:"u", l:"Out", lx:110, ly:285, target:this.nodeAdsr2});
+        this.addParam({type:"output", class:"o2", x:110, y:323, md:"u", l:svgEg, lx:110, ly:285, target:this.nodeAdsr2});
+        this.addParam({type:"output", class:"o2r", x:80, y:323, md:"u", l:svgEgR, lx:80, ly:285, target:this.nodeR2});
         this.div.addEventListener("input", (ev)=>{
             switch(ev.target.className) {
             case "A1": this.nodeAdsr1.attack.value = ev.target.value * 0.01; break;
@@ -564,14 +612,14 @@ class EG extends Module {
 }
 class LFO extends Module {
     constructor(rack, name) {
-        super(name, 100, 560);
+        super(name, 100, 540);
         this.rack = rack;
         this.type = "LFO";
         this.nodeLfo1 = new OscillatorNode(this.rack.actx, {frequency:1});
         this.nodeOut1 = new GainNode(this.rack.actx);
         this.nodeLfo1.connect(this.nodeOut1);
         this.nodeLfo1.start();
-        this.addElm({type:"title", label:"LFO", x:0, y:0});
+        this.addElm({type:"title", label:"LFO", x:0, y:0, opt:0});
         this.addParam({type:"output", class:"o1", x:80, y:63, md:"u", l:"Out", lx:80, ly:25, target:this.nodeOut1});
         this.addParam({type:"knob", class:"Frq1", x:50, y:90, d:45, val:1, min:0.1, max:100, step:0.1, log:1, vx:10, vy:120, l:"Freq", lx:25, ly:90});
         this.addParam({type:"slider", class:"Frm1", x:20, y:170, val:0, min:0, max:4, step:1, h:65, l:"Form", lx:25, ly:155});
@@ -621,7 +669,7 @@ class LFO extends Module {
 }
 class MISC extends Module {
     constructor(rack, name) {
-        super(name, 100, 560);
+        super(name, 100, 540);
         this.rack = rack;
         this.type = "MISC";
         this.nodeRing = new GainNode(this.rack.actx, {gain:0});
@@ -635,19 +683,11 @@ class MISC extends Module {
         this.addParam({type:"output", class:"so", x:70, y:243, md:"u", l:"Out", lx:70, ly:205, target:this.nodeSH});
 
         this.nodeNoise = new NoiseNode(this.rack.actx);
-
-        const buf = new Float32Array(rack.actx.sampleRate*2);
-        for(let i = 0; i < rack.actx.sampleRate*2; ++i)
-            buf[i] = (Math.random() + Math.random() + Math.random() + Math.random() + Math.random() + Math.random() - 3)/3;
-        this.noiseBuff = new AudioBuffer({length:rack.actx.sampleRate, numberOfChannels:1, sampleRate:rack.actx.sampleRate});
-        this.noiseBuff.copyToChannel(buf, 0);
-        this.nodeWhiteNoise = new AudioBufferSourceNode(this.rack.actx, {buffer:this.noiseBuff, loop:true});
-        this.nodeWhiteNoise.start();
         const feedforward = new Float32Array([0.049922035 * 4, -0.095993537 * 4, 0.050612699 * 4, -0.004408786 * 4]);
         const feedback = new Float32Array([1, -2.494956002, 2.017265875, -0.522189400])
         this.nodePinkFilter = new IIRFilterNode(rack.actx, {feedforward:feedforward, feedback:feedback});
         this.nodeNoise.connect(this.nodePinkFilter);
-        this.addElm({type:"title", label:"RING", x:0, y:0});
+        this.addElm({type:"title", label:"RING", x:0, y:0, opt:0});
         this.addElm({type:"title", label:"S/H", x:0, y:180});
         this.addElm({type:"title", label:"NOISE", x:0, y:360});
         this.addParam({mod:this, type:"output", class:"wo", x:70, y:428, md:"u", l:"White", lx:70, ly:390, target:this.nodeNoise});
@@ -656,7 +696,7 @@ class MISC extends Module {
 }
 class KEYBOARD extends Module {
     constructor(rack, name) {
-        super(name, 950,150,20,580);
+        super(name, 950,150,20,560);
         this.rack = rack;
         this.type = "KBD";
         this.nodeCV = new ConstantSourceNode(this.rack.actx, {offset:0});
@@ -667,8 +707,8 @@ class KEYBOARD extends Module {
         this.glideVal = 0;
         this.loop = 0;
         this.addElm({type:"title", label:"KEYBOARD", x:0, y:0});
-        this.addParam({type:"output", class:"cv", x:530, y:30, md:"d", l:"CV", lx:530, ly:60, target:this.nodeCV});
-        this.addParam({type:"output", class:"gt", x:560, y:30, md:"d", l:"Gate", lx:560, ly:60, target:this.nodeGate});
+        this.addParam({type:"output", class:"cv", x:530, y:35, md:"d", l:"CV", lx:530, ly:60, target:this.nodeCV});
+        this.addParam({type:"output", class:"gt", x:560, y:35, md:"d", l:"Gate", lx:560, ly:60, target:this.nodeGate});
         this.addParam({type:"knob", class:"Gl", x:540, y:80, d:45, val:0, min:0, max:100, step:1, l:"Glide", lx:515, ly:90});
         this.addElm({type:"keyboard", id:"keyboard", x:20, y:45});
         this.addElm({type:"text", label:"MML", x:600, y:30});
@@ -730,16 +770,9 @@ class Rack {
         this.splash = document.getElementById("splash");
         this.splashbutton = document.getElementById("splashbutton");
         this.menupane = document.getElementById("menupane");
-        this.menucancel = document.getElementById("menucancel");
-        this.menuok = document.getElementById("menuok");
+        this.menucancel = document.getElementById("menuCCancel");
+        this.menudisconnect = document.getElementById("menuCDisconnect");
         this.splashbutton.addEventListener("click", ()=>{this.start()});
-        this.menucancel.addEventListener("click", ()=>{
-            this.menupane.style.display = "none";
-        });
-        this.menuok.addEventListener("click", ()=>{
-            this.menupane.style.display = "none";
-            this.disconnect(this.focus);
-        });
         this.connection = {};
         for(let k in demoPatch) {
             const o = document.createElement("option");
@@ -749,8 +782,15 @@ class Rack {
 
         this.rackElm.addEventListener("pointerdown",(e)=>{
             const pt = this.getPt(e);
-            if(e.target.className == "input" || e.target.className == "output") {
+            switch(e.target.className) {
+            case "input":
+            case "output":
                 this.focus = this.click = this.drag = this.findJack(e.clientX, e.clientY);
+                break;
+            case "modopt":
+                this.focus = e.target.parentNode.parentNode.id;
+                console.log(this.focus)
+                break;
             }
         });
         this.rackElm.addEventListener("pointerup", (e)=>{
@@ -798,16 +838,53 @@ class Rack {
                     cable.drawMark(ptCur.x, ptCur.y, 0);
             }
         });
+        this.menupane.addEventListener("click", (e)=>{
+            switch(e.target.id) {
+            case "menuMCancel":
+            case "menuCCancel":
+                this.setMenuPane(0);
+                break;
+            case "menuCDisconnect":
+                this.setMenuPane(0);
+                this.disconnect(this.focus);
+                break;
+            case "menuMLeft":
+                console.log(this.focus)
+                this.moveLeft(e.target.parentNode);
+                this.setMenuPane(0);
+                break;
+            case "menuMDel":
+                this.modDel(this.focus);
+                this.setMenuPane(0);
+                break;
+            }
+        });
         this.rackElm.addEventListener("click", (e)=>{
+            const ptCur = this.getPt(e);
+            if(e.target.className == "modopt") {
+                this.setMenuPane(2);
+                const mstyle = document.getElementById("menuModule").style;
+                mstyle.top = ptCur.y+"px";
+                mstyle.left = ptCur.x+"px";
+            }
             if(this.click) {
-                const ptCur = this.getPt(e);
-                const mstyle = document.getElementById("menu").style;
-                document.getElementById("menupane").style.display = "block";
+                this.setMenuPane(1);
+                const mstyle = document.getElementById("menuCable").style;
                 mstyle.top = ptCur.y+"px";
                 mstyle.left = ptCur.x+"px";
                 this.click = false;
             }
         });
+    }
+    setMenuPane(p) {
+        const pstyle = document.getElementById("menupane").style;
+        const m1style = document.getElementById("menuCable").style;
+        const m2style = document.getElementById("menuModule").style;
+        switch(p) {
+        case 0: pstyle.display = "none"; break;
+        case 1: m1style.display = "block"; m2style.display = "none"; pstyle.display = "block"; break;
+        case 2: m1style.display = "none"; m2style.display = "block"; pstyle.display = "block"; break;
+        }
     }
     getPt(e) {
         if(e instanceof Param) {
@@ -817,11 +894,6 @@ class Rack {
         }
         const rc = this.rackElm.getBoundingClientRect();
         return {x:e.clientX - rc.left, y:e.clientY - rc.top};
-        const rpos = document.getElementById("cablepane").getBoundingClientRect();
-        const mpos = this.mod.div.getBoundingClientRect();
-        if(e.offsetX!=undefined)
-            return {x:e.offsetX + mpos.left - rpos.left, y:e.offsetY + mpos.top - rpos.top};
-        return {x:e.x + mpos.left - rpos.left, y:e.y + mpos.top - rpos.top};
     }
     start() {
         console.log("rack.start");
@@ -892,6 +964,37 @@ class Rack {
             }
         }
         this.draw();
+    }
+    modDel(id) {
+        console.log("modDel",id);
+        const idx = this.findModIdx(id);
+        if(idx != null) {
+            this.modules.splice(idx, 1);
+        }
+    }
+    moveLeft(elm) {
+        console.log(elm.id);
+        console.log(this.createNewId());
+    }
+    findModIdx(id) {
+        for(let i = 0; i < this.modules.length; ++i) {
+            if(this.modules[i].id == id) {
+                return i;
+            }
+        }
+        return null;
+    }
+    createNewId() {
+        let id, j;
+        for(id = 1; ; ++id) {
+            for(j = 0; j < this.modules.length; ++j) {
+                if(this.modules[j].id == id)
+                    break;
+            }
+            if(j >= this.modules.length)
+                return id;
+        }
+        return null;
     }
     draw() {
         cable.clear();
